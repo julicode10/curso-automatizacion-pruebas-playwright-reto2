@@ -1,52 +1,64 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+let inputBox, inputContent, page: Page
+
+test.describe.configure({ mode: "serial" })
+
+test.beforeAll(async ({ browser }) => {
+  page = await browser.newPage()
+})
 
 test.beforeEach(async ({ page }) => {
+  inputContent = ""
+
   await page.goto('/');
+  await page.getByText("Search").click();
+
+  inputBox = page.locator("#docsearch-input")
 });
 
+test.afterAll(async () => {
+  await page.close()
+})
+
 test('Realizar una busqueda que no tenga resultados', async ({ page }) => {
-  await page.getByRole('button').click();
+  inputContent = "hasnocontent"
 
-  await page.getByPlaceholder('Search docs').click();
+  await page.type("#docsearch-input", inputContent)
 
-  await page.getByPlaceholder('Search docs').fill('hascontent');
+  // await page.getByPlaceholder('Search docs').click();
+  // await page.getByPlaceholder('Search docs').fill('hascontent');
 
-  expect(page.locator('.DocSearch-NoResults p')).toBeVisible();
+  const messageParagraph = page.locator('p.DocSearch-Title > strong')
 
-  expect(page.locator('.DocSearch-NoResults p')).toHaveText('No results for hascontent');
+  await expect(messageParagraph).toBeVisible();
+  await expect(messageParagraph).toHaveText(inputContent);
 
 })
 
 test('Limpiar el input de busqueda', async ({ page }) => {
-  await page.getByRole('button', { name: 'Search' }).click();
+  inputContent = "somerandomtext"
+  inputBox = page.locator("#docsearch-input")
 
-  const searchBox = page.getByPlaceholder('Search docs');
+  await inputBox.type(inputContent)
 
-  await searchBox.click();
+  await expect(inputBox).toHaveAttribute('value', inputContent);
 
-  await searchBox.fill('somerandomtext');
+  await page.click("button[title='Clear the query']");
 
-  await expect(searchBox).toHaveText('somerandomtext');
-
-  await page.getByRole('button', { name: 'Clear the query' }).click();
-
-  await expect(searchBox).toHaveAttribute('value', '');
+  await expect(inputBox).toHaveAttribute('value', '');
 });
 
 test('Realizar una busqueda que genere al menos tenga un resultado', async ({ page }) => {
-  await page.getByRole('button', { name: 'Search ' }).click();
+  inputContent = "havetext"
+  await inputBox.type(inputContent);
 
-  const searchBox = page.getByPlaceholder('Search docs');
-
-  await searchBox.click();
-
-  await page.getByPlaceholder('Search docs').fill('havetext');
-
-  expect(searchBox).toHaveText('havetext');
+  await expect(inputBox).toHaveAttribute('value', inputContent);
 
   // Verity there are sections in the results
-  await page.locator('.DocSearch-Dropdown-Container section').nth(1).waitFor();
-  const numberOfResults = await page.locator('.DocSearch-Dropdown-Container section').count();
+  const containerSelector = ".DocSearch-Dropdown-Container section"
+  await page.locator(containerSelector).nth(1).waitFor();
+  const numberOfResults = await page.locator(containerSelector).count();
   await expect(numberOfResults).toBeGreaterThan(0);
 
 });
